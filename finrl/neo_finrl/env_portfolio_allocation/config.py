@@ -1,0 +1,1 @@
+INPUT_DATA_DIR = 'data'
