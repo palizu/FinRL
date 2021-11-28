@@ -354,7 +354,7 @@ class CryptoTradingEnv(gym.Env):
             self.date_memory.append(self._get_date())
             self.reward = self.get_reward()
             if self.reward < 0:
-                self.reward *= 5
+                self.reward *= 2
             self.rewards_memory.append(self.reward)
             self.reward = self.reward * self.reward_scaling
 
