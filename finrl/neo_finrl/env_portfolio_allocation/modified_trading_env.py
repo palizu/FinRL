@@ -352,17 +352,26 @@ class CryptoTradingEnv(gym.Env):
             )
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
-            self.reward = end_total_asset - begin_total_asset
+            self.reward = self.get_reward()
             if self.reward < 0:
-                self.reward *= 10
+                self.reward *= 5
             self.rewards_memory.append(self.reward)
             self.reward = self.reward * self.reward_scaling
 
         return self.state, self.reward, self.terminal, {}
 
+    def get_reward(self):
+        end_total_asset = self.state[0] + sum(
+                np.array(self.state[1 : (self.stock_dim + 1)])
+                * np.array(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
+            )
+        rw = end_total_asset - self.initial_amount - max(0, end_total_asset*0.1 - self.state[0])
+        rw = rw / self.day
+        return rw
+
     def reset(self):
         # initiate state
-        self.state = self._initiate_state()
+        self.state = self._initiate_state() 
 
         if self.initial:
             self.asset_memory = [self.initial_amount]
