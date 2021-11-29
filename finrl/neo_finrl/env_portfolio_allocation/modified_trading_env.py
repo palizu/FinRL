@@ -334,8 +334,7 @@ class CryptoTradingEnv(gym.Env):
                 # print('take buy action: {}'.format(actions[index]))
                 actions[index] = self._buy_stock(index, actions[index])
 
-            new_act = self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)] + [self.state[0]]
-            self.actions_memory.append(new_act)
+            self.actions_memory.append(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
 
             # state: s -> s+1
             self.day += 1
@@ -354,8 +353,6 @@ class CryptoTradingEnv(gym.Env):
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
             self.reward = self.get_reward()
-            if self.reward < 0:
-                self.reward *= 1.5
             self.rewards_memory.append(self.reward)
             self.reward = self.reward * self.reward_scaling
 
@@ -514,7 +511,7 @@ class CryptoTradingEnv(gym.Env):
 
             action_list = self.actions_memory
             df_actions = pd.DataFrame(action_list)
-            df_actions.columns = np.append(self.data.tic.values, 'cash')
+            df_actions.columns = self.data.tic.values
             df_actions.index = df_date.date
             # df_actions = pd.DataFrame({'date':date_list,'actions':action_list})
         else:
