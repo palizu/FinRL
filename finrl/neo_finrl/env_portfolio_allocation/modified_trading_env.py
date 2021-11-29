@@ -513,7 +513,7 @@ class CryptoTradingEnv(gym.Env):
 
             action_list = self.actions_memory
             df_actions = pd.DataFrame(action_list)
-            df_actions.columns = self.data.tic.values
+            df_actions.columns = self.data.tic.values.append('cash')
             df_actions.index = df_date.date
             # df_actions = pd.DataFrame({'date':date_list,'actions':action_list})
         else:
