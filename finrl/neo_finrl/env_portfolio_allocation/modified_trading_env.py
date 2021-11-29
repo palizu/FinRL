@@ -334,7 +334,8 @@ class CryptoTradingEnv(gym.Env):
                 # print('take buy action: {}'.format(actions[index]))
                 actions[index] = self._buy_stock(index, actions[index])
 
-            self.actions_memory.append(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)].append(self.state[0]))
+            new_act = np.append(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)], self.state[0])
+            self.actions_memory.append(new_act)
 
             # state: s -> s+1
             self.day += 1
