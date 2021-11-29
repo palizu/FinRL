@@ -334,7 +334,7 @@ class CryptoTradingEnv(gym.Env):
                 # print('take buy action: {}'.format(actions[index]))
                 actions[index] = self._buy_stock(index, actions[index])
 
-            self.actions_memory.append(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
+            self.actions_memory.append(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)].append(self.state[0]))
 
             # state: s -> s+1
             self.day += 1
@@ -354,7 +354,7 @@ class CryptoTradingEnv(gym.Env):
             self.date_memory.append(self._get_date())
             self.reward = self.get_reward()
             if self.reward < 0:
-                self.reward *= 2
+                self.reward *= 1.5
             self.rewards_memory.append(self.reward)
             self.reward = self.reward * self.reward_scaling
 
@@ -416,7 +416,7 @@ class CryptoTradingEnv(gym.Env):
                             self.data[tech].values.tolist()
                             for tech in self.tech_indicator_list
                         ],
-                        [],
+                        [], 
                     )
                 )
             else:
