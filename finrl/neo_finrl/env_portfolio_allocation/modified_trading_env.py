@@ -429,7 +429,6 @@ class CryptoTradingEnv(gym.Env):
             reward = (
                 (total_assets - total_penalty + additional_reward) / self.initial_amount
             ) - 1
-            reward /= self.day
 
             return reward
 
