@@ -40,11 +40,15 @@ class CryptoTradingEnv(gym.Env):
         mode="",
         iteration="",
         min_buy_amount=[],
-        min_transaction_amount=0
+        min_transaction_amount=0,
+        stoploss_penalty=0.9,
+        profit_loss_ratio=2,
+        cash_penalty_proportion=0.1,
     ):
         self.day = day
         self.df = df
         self.stock_dim = stock_dim
+        self.assets = df.tic.unique()
         self.hmax = hmax
         self.initial_amount = initial_amount
         self.buy_cost_pct = buy_cost_pct
@@ -53,6 +57,10 @@ class CryptoTradingEnv(gym.Env):
         self.state_space = state_space
         self.action_space = action_space
         self.tech_indicator_list = tech_indicator_list
+        self.stoploss_penalty = stoploss_penalty
+        self.profit_loss_ratio = profit_loss_ratio
+        self.min_profit_penalty = 1 + profit_loss_ratio * (1 - self.stoploss_penalty)
+        self.cash_penalty_proportion = cash_penalty_proportion
         self.action_space = spaces.Box(low=-1, high=1, shape=(self.action_space,))
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(self.state_space,)
@@ -301,12 +309,10 @@ class CryptoTradingEnv(gym.Env):
             return self.state, self.reward, self.terminal, {}
 
         else:
-
-            actions = actions * self.hmax  # actions initially is scaled between 0 to 1
-            # actions[abs(actions) < 1e-6] = 0
-            # actions = actions.astype(
-            #     int
-            # )  # convert into integer because we can't by fraction of shares
+            self.prev_holdings = np.array(self.state[(self.stock_dim) + 1 : (self.stock_dim*2 + 1)])
+            closings = np.array(self.state[1 : (self.stock_dim + 1)])
+            actions = np.array(actions * self.hmax)  # actions initially is scaled between 0 to 1
+            self.reward = self.get_reward()
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
                     actions = np.array([-self.hmax] * self.stock_dim)
@@ -315,6 +321,13 @@ class CryptoTradingEnv(gym.Env):
                 * np.array(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
             )
             # print("begin_total_asset:{}".format(begin_total_asset))
+
+            self.closing_diff_avg_buy = closings - (self.stoploss_penalty * self.avg_buy_price)
+            if begin_total_asset >= self.stoploss_penalty * self.initial_amount:
+                # clear out position if stop-loss criteria is met
+                actions = np.where(
+                    self.closing_diff_avg_buy < 0, -np.array(self.prev_holdings), actions
+                )
 
             argsort_actions = np.argsort(actions)
 
@@ -335,6 +348,29 @@ class CryptoTradingEnv(gym.Env):
                 actions[index] = self._buy_stock(index, actions[index])
 
             self.actions_memory.append(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
+            holdings = np.array(self.state[(self.stock_dim) + 1 : (self.stock_dim*2 + 1)])
+
+            sells = -np.clip(actions, -np.inf, 0)
+            buys = np.clip(actions, 0, np.inf)
+
+            sell_closing_price = np.where(sells > 0, closings, 0) 
+            profit_sell = np.where(sell_closing_price > 0, 1, 0)
+            self.profit_sell_diff_avg_buy = np.where(
+                profit_sell == 1, 
+                closings - (self.min_profit_penalty * self.avg_buy_price), 
+                0
+            )
+
+            buys = np.sign(buys)
+            self.n_buys += buys
+            self.avg_buy_price = np.where(
+                buys > 0,
+                self.avg_buy_price + ((closings - self.avg_buy_price) / self.n_buys),
+                self.avg_buy_price,
+            )
+
+            self.n_buys = np.where(holdings > 0, self.n_buys, 0)
+            self.avg_buy_price = np.where(holdings > 0, self.avg_buy_price, 0)
 
             # state: s -> s+1
             self.day += 1
@@ -350,27 +386,62 @@ class CryptoTradingEnv(gym.Env):
                 np.array(self.state[1 : (self.stock_dim + 1)])
                 * np.array(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
             )
+
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
-            self.reward = self.get_reward()
             self.rewards_memory.append(self.reward)
             self.reward = self.reward * self.reward_scaling
 
         return self.state, self.reward, self.terminal, {}
 
     def get_reward(self):
-        end_total_asset = self.state[0] + sum(
+        if self.day == 0:
+            return 0
+        else:
+            total_assets = self.state[0] + sum(
                 np.array(self.state[1 : (self.stock_dim + 1)])
                 * np.array(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
             )
-        rw = end_total_asset - self.initial_amount - max(0, end_total_asset*0.1 - self.state[0])
-        rw = rw / self.day
-        return rw
+            cash = self.state[0]
+            holdings = self.state[(self.stock_dim + 1) : (self.stock_dim*2 + 1)]
+            neg_closing_diff_avg_buy = np.clip(self.closing_diff_avg_buy, -np.inf, 0)
+            neg_profit_sell_diff_avg_buy = np.clip(
+                self.profit_sell_diff_avg_buy, -np.inf, 0
+            )
+            pos_profit_sell_diff_avg_buy = np.clip(
+                self.profit_sell_diff_avg_buy, 0, np.inf
+            )
+
+            cash_penalty = max(0, (total_assets * self.cash_penalty_proportion - cash))
+            if self.day > 1:
+                stop_loss_penalty = -1 * np.dot(
+                    np.array(self.prev_holdings), neg_closing_diff_avg_buy
+                )
+            else:
+                stop_loss_penalty = 0
+            low_profit_penalty = -1 * np.dot(
+                np.array(holdings), neg_profit_sell_diff_avg_buy
+            )
+            total_penalty = cash_penalty + stop_loss_penalty + low_profit_penalty
+
+            additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
+
+            reward = (
+                (total_assets - total_penalty + additional_reward) / self.initial_amount
+            ) - 1
+            reward /= self.day
+
+            return reward
 
     def reset(self):
         # initiate state
         self.state = self._initiate_state() 
-
+        self.closing_diff_avg_buy = np.zeros(len(self.assets))
+        self.profit_sell_diff_avg_buy = np.zeros(len(self.assets))
+        self.n_buys = np.zeros(len(self.assets))
+        self.avg_buy_price = np.zeros(len(self.assets))
+        self.prev_holdings = np.zeros(len(self.assets))
+        
         if self.initial:
             self.asset_memory = [self.initial_amount]
         else:

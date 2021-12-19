@@ -19,7 +19,6 @@ class StockTradingEnvStopLoss(gym.Env):
     This environment penalizes the model if excedeed the stop-loss threshold, selling assets with under expectation %profit, and also
     for not maintaining a reserve of cash.
     This enables the model to do trading with high confidence and manage cash reserves in addition to performing trading procedures.
-
     Reward at any step is given as follows
         r_i = (sum(cash, asset_value) + additional_reward - total_penalty - initial_cash) / initial_cash / days_elapsed
         , where total_penalty = cash_penalty + stop_loss_penalty + low_profit_penalty
@@ -27,10 +26,8 @@ class StockTradingEnvStopLoss(gym.Env):
                 stop_loss_penalty = -1 * dot(holdings,negative_closing_diff_avg_buy)
                 low_profit_penalty = -1 * dot(holdings,negative_profit_sell_diff_avg_buy)
                 additional_reward = dot(holdings,positive_profit_sell_diff_avg_buy)
-
         This reward function takes into account a profit/loss ratio constraint, liquidity requirement, as well as long-term accrued rewards.
         This reward function also forces the model to trade only when it's really confident to do so.
-
     Parameters:
     state space: {start_cash, <owned_shares>, for s in stocks{<stock.values>}, }
         df (pandas.DataFrame): Dataframe containing data
