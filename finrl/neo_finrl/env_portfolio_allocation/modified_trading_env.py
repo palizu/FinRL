@@ -316,14 +316,14 @@ class CryptoTradingEnv(gym.Env):
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
                     actions = np.array([-self.hmax] * self.stock_dim)
-            begin_total_asset = self.state[0] + sum(
+            self.begin_total_asset = self.state[0] + sum(
                 np.array(self.state[1 : (self.stock_dim + 1)])
                 * np.array(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
             )
             # print("begin_total_asset:{}".format(begin_total_asset))
 
             self.closing_diff_avg_buy = closings - (self.stoploss_penalty * self.avg_buy_price)
-            if begin_total_asset >= self.stoploss_penalty * self.initial_amount:
+            if self.begin_total_asset >= self.stoploss_penalty * self.initial_amount:
                 # clear out position if stop-loss criteria is met
                 actions = np.where(
                     self.closing_diff_avg_buy < 0, -np.array(self.prev_holdings), actions
@@ -426,9 +426,10 @@ class CryptoTradingEnv(gym.Env):
 
             additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
 
-            reward = (
-                (total_assets - total_penalty + additional_reward) / self.initial_amount
-            ) - 1
+            # reward = (
+            #     (total_assets - total_penalty + additional_reward) / self.initial_amount
+            # ) - 1
+            reward = total_assets - total_penalty + additional_reward - self.begin_total_asset
 
             return reward
 
