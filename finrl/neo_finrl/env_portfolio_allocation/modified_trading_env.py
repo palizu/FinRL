@@ -78,6 +78,7 @@ class CryptoTradingEnv(gym.Env):
         self.iteration = iteration
         self.min_buy_amount= [int(i) for i in min_buy_amount]
         self.min_transaction_amount = min_transaction_amount
+        self.peak = self.initial_amount
         # initalize state
         self.state = self._initiate_state()
 
@@ -323,7 +324,7 @@ class CryptoTradingEnv(gym.Env):
             # print("begin_total_asset:{}".format(begin_total_asset))
 
             self.closing_diff_avg_buy = closings - (self.stoploss_penalty * self.avg_buy_price)
-            if self.begin_total_asset >= self.stoploss_penalty * self.initial_amount:
+            if self.begin_total_asset >= self.stoploss_penalty * self.peak:
                 # clear out position if stop-loss criteria is met
                 actions = np.where(
                     self.closing_diff_avg_buy < 0, -np.array(self.prev_holdings), actions
@@ -386,6 +387,8 @@ class CryptoTradingEnv(gym.Env):
                 np.array(self.state[1 : (self.stock_dim + 1)])
                 * np.array(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
             )
+            if self.peak < end_total_asset:
+                self.peak = end_total_asset 
 
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
