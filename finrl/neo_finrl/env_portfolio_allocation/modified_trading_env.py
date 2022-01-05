@@ -429,10 +429,10 @@ class CryptoTradingEnv(gym.Env):
 
             additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
 
-            reward = (
-                (total_assets - total_penalty + additional_reward) / self.initial_amount
-            ) - 1
-            # reward = total_assets - total_penalty + additional_reward - self.begin_total_asset
+            # reward = (
+            #     (total_assets - total_penalty + additional_reward) / self.initial_amount
+            # ) - 1
+            reward = total_assets - total_penalty + additional_reward - self.begin_total_asset
 
             return reward
 
