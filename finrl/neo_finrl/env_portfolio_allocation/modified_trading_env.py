@@ -425,7 +425,8 @@ class CryptoTradingEnv(gym.Env):
             low_profit_penalty = -1 * np.dot(
                 np.array(holdings), neg_profit_sell_diff_avg_buy
             )
-            total_penalty = cash_penalty + stop_loss_penalty + low_profit_penalty
+            total_penalty = stop_loss_penalty + low_profit_penalty 
+            # + cash_penalty
 
             additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
 
@@ -447,6 +448,7 @@ class CryptoTradingEnv(gym.Env):
         
         if self.initial:
             self.asset_memory = [self.initial_amount]
+            self.peak = self.initial_amount
         else:
             previous_total_asset = self.previous_state[0] + sum(
                 np.array(self.state[1 : (self.stock_dim + 1)])
@@ -455,6 +457,7 @@ class CryptoTradingEnv(gym.Env):
                 )
             )
             self.asset_memory = [previous_total_asset]
+            self.peak = self.previous_state[self.stock_dim * 3 + 1]
 
         self.day = 0
         self.data = self.df.loc[self.day, :]
@@ -483,6 +486,8 @@ class CryptoTradingEnv(gym.Env):
                     [self.initial_amount]
                     + self.data.close.values.tolist()
                     + [0] * self.stock_dim
+                    + [0] * self.stock_dim
+                    + [self.initial_amount]
                     + sum(
                         [
                             self.data[tech].values.tolist()
@@ -497,6 +502,8 @@ class CryptoTradingEnv(gym.Env):
                     [self.initial_amount]
                     + [self.data.close]
                     + [0] * self.stock_dim
+                    + [0] * self.stock_dim
+                    + [self.initial_amount]
                     + sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
                 )
         else:
@@ -509,6 +516,10 @@ class CryptoTradingEnv(gym.Env):
                     + self.previous_state[
                         (self.stock_dim + 1) : (self.stock_dim * 2 + 1)
                     ]
+                    + self.previous_state[
+                        (self.stock_dim * 2 + 1) : (self.stock_dim * 3 + 1)
+                    ]
+                    + [self.previous_state[self.stock_dim * 3 + 1]]
                     + sum(
                         [
                             self.data[tech].values.tolist()
@@ -528,6 +539,10 @@ class CryptoTradingEnv(gym.Env):
                     + self.previous_state[
                         (self.stock_dim + 1) : (self.stock_dim * 2 + 1)
                     ]
+                    + self.previous_state[
+                        (self.stock_dim * 2 + 1) : (self.stock_dim * 3 + 1)
+                    ]
+                    + [self.previous_state[self.stock_dim * 3 + 1]]
                     + sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
                 )
         return state
@@ -539,6 +554,8 @@ class CryptoTradingEnv(gym.Env):
                 [self.state[0]]
                 + self.data.close.values.tolist()
                 + list(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
+                + list(self.avg_buy_price)
+                + [self.peak]
                 + sum(
                     [
                         self.data[tech].values.tolist()
@@ -554,6 +571,8 @@ class CryptoTradingEnv(gym.Env):
                 [self.state[0]]
                 + [self.data.close]
                 + list(self.state[(self.stock_dim + 1) : (self.stock_dim * 2 + 1)])
+                + list(self.avg_buy_price)
+                + [self.peak]
                 + sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
             )
 
