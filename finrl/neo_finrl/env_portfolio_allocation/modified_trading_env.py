@@ -425,7 +425,7 @@ class CryptoTradingEnv(gym.Env):
             low_profit_penalty = -1 * np.dot(
                 np.array(holdings), neg_profit_sell_diff_avg_buy
             )
-            total_penalty = stop_loss_penalty #+ low_profit_penalty 
+            total_penalty = stop_loss_penalty + low_profit_penalty 
             # + cash_penalty
 
             additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
