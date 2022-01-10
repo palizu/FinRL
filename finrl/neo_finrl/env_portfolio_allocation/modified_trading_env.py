@@ -430,10 +430,10 @@ class CryptoTradingEnv(gym.Env):
 
             additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
 
-            # reward = (
-            #     (total_assets - total_penalty + additional_reward) / self.initial_amount
-            # ) - 1
-            reward = total_assets - total_penalty + additional_reward - self.begin_total_asset
+            reward = (
+                (total_assets - total_penalty + additional_reward) / self.initial_amount
+            ) - 1
+            #reward = total_assets - total_penalty + additional_reward - self.begin_total_asset
 
             return reward
 
@@ -448,7 +448,6 @@ class CryptoTradingEnv(gym.Env):
         
         if self.initial:
             self.asset_memory = [self.initial_amount]
-            self.peak = self.initial_amount
         else:
             previous_total_asset = self.previous_state[0] + sum(
                 np.array(self.state[1 : (self.stock_dim + 1)])
@@ -457,7 +456,6 @@ class CryptoTradingEnv(gym.Env):
                 )
             )
             self.asset_memory = [previous_total_asset]
-            self.peak = self.previous_state[self.stock_dim * 3 + 1]
 
         self.day = 0
         self.data = self.df.loc[self.day, :]
@@ -519,7 +517,7 @@ class CryptoTradingEnv(gym.Env):
                     + self.previous_state[
                         (self.stock_dim * 2 + 1) : (self.stock_dim * 3 + 1)
                     ]
-                    + [self.previous_state[self.stock_dim * 3 + 1]]
+                    + [self.previous_state[0]]
                     + sum(
                         [
                             self.data[tech].values.tolist()
@@ -542,7 +540,7 @@ class CryptoTradingEnv(gym.Env):
                     + self.previous_state[
                         (self.stock_dim * 2 + 1) : (self.stock_dim * 3 + 1)
                     ]
-                    + [self.previous_state[self.stock_dim * 3 + 1]]
+                    + [self.previous_state[0]]
                     + sum([[self.data[tech]] for tech in self.tech_indicator_list], [])
                 )
         return state
