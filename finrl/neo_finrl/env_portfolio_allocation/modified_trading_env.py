@@ -61,7 +61,7 @@ class CryptoTradingEnv(gym.Env):
         self.profit_loss_ratio = profit_loss_ratio
         self.min_profit_penalty = 1 + profit_loss_ratio * (1 - self.stoploss_penalty)
         self.cash_penalty_proportion = cash_penalty_proportion
-        self.action_space = spaces.Box(low=-1, high=1, shape=(self.action_space,))
+        self.action_space = spaces.Box(low=-self.hmax, high=self.hmax, shape=(self.action_space,))
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(self.state_space,)
         )
@@ -312,7 +312,6 @@ class CryptoTradingEnv(gym.Env):
         else:
             self.prev_holdings = np.array(self.state[(self.stock_dim) + 1 : (self.stock_dim*2 + 1)])
             closings = np.array(self.state[1 : (self.stock_dim + 1)])
-            actions = np.array(actions * self.hmax)  # actions initially is scaled between 0 to 1
             self.reward = self.get_reward()
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
@@ -434,6 +433,7 @@ class CryptoTradingEnv(gym.Env):
             #     (total_assets - total_penalty + additional_reward) / self.initial_amount
             # ) - 1
             reward = total_assets - total_penalty + additional_reward - self.begin_total_asset
+        
 
             return reward
 
