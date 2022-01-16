@@ -60,6 +60,7 @@ class CryptoTradingEnv(gym.Env):
         self.stoploss_penalty = stoploss_penalty
         self.profit_loss_ratio = profit_loss_ratio
         self.min_profit_penalty = 1 + profit_loss_ratio * (1 - self.stoploss_penalty)
+        self.overtrade_penalty = 0
         self.cash_penalty_proportion = cash_penalty_proportion
         self.action_space = spaces.Box(low=-self.hmax, high=self.hmax, shape=(self.action_space,))
         self.observation_space = spaces.Box(
@@ -102,10 +103,9 @@ class CryptoTradingEnv(gym.Env):
                 # Sell only if the price is > 0 (no missing data in this particular date)
                 # perform sell action based on the sign of the action
                 if self.state[index + self.stock_dim + 1] > 0:
-                    # Sell only if current asset is > 0
-                    # if self.min_buy_amount != []:
-                    #     r_action = int(action / self.min_buy_amount[index])
-                    #     r_action = r_action * self.min_buy_amount[index]
+
+                    if abs(action) > self.state[index + self.stock_dim + 1]:
+                        self.overtrade_penalty = self.overtrade_penalty + (action - self.state[index + self.stock_dim + 1]) * self.state[1 + index]
 
                     sell_num_shares = min(
                         abs(action), self.state[index + self.stock_dim + 1]
@@ -176,11 +176,9 @@ class CryptoTradingEnv(gym.Env):
             if self.state[index + 1] > 0:
                 # Buy only if the price is > 0 (no missing data in this particular date)
                 available_amount = self.state[0] / (self.state[index + 1] * (1 + self.buy_cost_pct))
-                # if self.min_buy_amount != []:
-                #     available_amount = int(available_amount / self.min_buy_amount[index])
-                #     available_amounts = available_amount * self.min_buy_amount[index]
-                #     r_action = int(action / self.min_buy_amount[index])
-                #     r_action = r_action * self.min_buy_amount[index]
+
+                if action > available_amount:
+                    self.overtrade_penalty = self.overtrade_penalty + (action - available_amount) * self.state[1 + index]
 
                 # update balance
                 buy_num_shares = min(available_amount, action)
@@ -227,6 +225,7 @@ class CryptoTradingEnv(gym.Env):
         plt.close()
 
     def step(self, actions):
+        self.overtrade_penalty = 0
         self.terminal = self.day >= len(self.df.index.unique()) - 1
         if self.terminal:
             # print(f"Episode: {self.episode}")
@@ -312,7 +311,6 @@ class CryptoTradingEnv(gym.Env):
         else:
             self.prev_holdings = np.array(self.state[(self.stock_dim) + 1 : (self.stock_dim*2 + 1)])
             closings = np.array(self.state[1 : (self.stock_dim + 1)])
-            self.reward = self.get_reward()
             if self.turbulence_threshold is not None:
                 if self.turbulence >= self.turbulence_threshold:
                     actions = np.array([-self.hmax] * self.stock_dim)
@@ -388,7 +386,8 @@ class CryptoTradingEnv(gym.Env):
             )
             if self.peak < end_total_asset:
                 self.peak = end_total_asset 
-
+            
+            self.reward = self.get_reward()
             self.asset_memory.append(end_total_asset)
             self.date_memory.append(self._get_date())
             self.rewards_memory.append(self.reward)
@@ -417,15 +416,14 @@ class CryptoTradingEnv(gym.Env):
             cash_penalty = max(0, (total_assets * self.cash_penalty_proportion - cash))
             if self.day > 1:
                 stop_loss_penalty = -1 * np.dot(
-                    np.array(self.prev_holdings), neg_closing_diff_avg_buy
+                    np.array(holdings), neg_closing_diff_avg_buy
                 )
             else:
                 stop_loss_penalty = 0
             low_profit_penalty = -1 * np.dot(
                 np.array(holdings), neg_profit_sell_diff_avg_buy
             )
-            total_penalty = stop_loss_penalty + low_profit_penalty 
-            # + cash_penalty
+            total_penalty = stop_loss_penalty + low_profit_penalty  + cash_penalty + self.overtrade_penalty
 
             additional_reward = np.dot(np.array(holdings), pos_profit_sell_diff_avg_buy)
 
@@ -445,6 +443,7 @@ class CryptoTradingEnv(gym.Env):
         self.n_buys = np.zeros(len(self.assets))
         self.avg_buy_price = np.zeros(len(self.assets))
         self.prev_holdings = np.zeros(len(self.assets))
+        self.overtrade_penalty = 0
         
         if self.initial:
             self.asset_memory = [self.initial_amount]
