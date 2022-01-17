@@ -222,13 +222,23 @@ class StockPortfolioEnv(gym.Env):
         softmax_output = numerator / denominator
         return softmax_output
 
+    # def save_asset_memory(self):
+    #     date_list = self.date_memory
+    #     portfolio_return = self.portfolio_return_memory
+    #     # print(len(date_list))
+    #     # print(len(asset_list))
+    #     df_account_value = pd.DataFrame(
+    #         {"date": date_list, "daily_return": portfolio_return}
+    #     )
+    #     return df_account_value
+
     def save_asset_memory(self):
         date_list = self.date_memory
-        portfolio_return = self.portfolio_return_memory
+        asset_list = self.asset_memory
         # print(len(date_list))
         # print(len(asset_list))
         df_account_value = pd.DataFrame(
-            {"date": date_list, "daily_return": portfolio_return}
+            {"date": date_list, "account_value": asset_list}
         )
         return df_account_value
 
