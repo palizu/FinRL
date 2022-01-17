@@ -85,6 +85,8 @@ class StockPortfolioEnv(gym.Env):
         self.state_space = state_space
         self.action_space = action_space
         self.tech_indicator_list = tech_indicator_list
+        self.cost = "to be impl"
+        self.trades = "to be impl"
 
         # action_space normalization and shape is self.stock_dim
         self.action_space = spaces.Box(low=0, high=1, shape=(self.action_space,))
