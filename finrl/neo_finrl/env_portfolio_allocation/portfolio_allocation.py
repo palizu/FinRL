@@ -161,7 +161,7 @@ class StockPortfolioEnv(gym.Env):
 
             asset_distribution = self.asset_memory[-1] * weights
             close_values = np.append([1], self.data.close.values.tolist())
-            target_holding = np.divide(asset_distribution, close_values)
+            target_holding = np.divide(weights, close_values)
             trading = np.array(self.actions_memory[-1]) - target_holding
             trading = trading[1:]
             self.trades += len(trading[trading != 0]) 
