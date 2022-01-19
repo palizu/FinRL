@@ -161,8 +161,8 @@ class StockPortfolioEnv(gym.Env):
 
             asset_distribution = self.asset_memory[-1] * weights
             close_values = np.append([1], self.data.close.values.tolist())
-            target_holding = np.divide(asset_distribution, close_values)
-            trading = np.array(self.actions_memory[-1]) - target_holding
+            target_holding = np.divide(asset_distribution[1:], close_values)
+            trading = np.array(self.actions_memory[-1]]) - target_holding
             trading = trading[1:]
             self.trades += len(trading[trading != 0]) 
 
@@ -178,9 +178,13 @@ class StockPortfolioEnv(gym.Env):
             for index in buy_index:
                 # print('take buy action: {}'.format(actions[index]))
                 target_holding[0] -= close_values[index + 1] * trading[index] * (1 + self.transaction_cost_pct)
-                self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct          
+                self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct   
 
-            self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] 
+            if target_holding < 0:
+                penalty = target_holding
+                target_holding = 0       
+
+            self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] + penalty
             self.asset_memory.append(np.sum(np.multiply(target_holding, close_values), axis= 1))
 
 
