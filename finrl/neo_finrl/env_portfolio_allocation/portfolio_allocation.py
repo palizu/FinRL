@@ -85,8 +85,8 @@ class StockPortfolioEnv(gym.Env):
         self.state_space = state_space
         self.action_space = action_space
         self.tech_indicator_list = tech_indicator_list
-        self.cost = "to be impl"
-        self.trades = "to be impl"
+        self.cost = 0
+        self.trades = 0
 
         # action_space normalization and shape is self.stock_dim
         self.action_space = spaces.Box(low=0, high=1, shape=(self.action_space,))
@@ -115,7 +115,7 @@ class StockPortfolioEnv(gym.Env):
         self.asset_memory = [self.initial_amount]
         # memorize portfolio return each step
         self.portfolio_return_memory = [0]
-        self.actions_memory = [[1 / self.stock_dim] * self.stock_dim]
+        self.actions_memory = [[self.initial_amount] + [0] * self.stock_dim]
         self.date_memory = [self.data.date.unique()[0]]
 
     def step(self, actions):
@@ -158,8 +158,33 @@ class StockPortfolioEnv(gym.Env):
             # else:
             #  norm_actions = actions
             weights = self.softmax_normalization(actions)
-            # print("Normalized actions: ", weights)
-            self.actions_memory.append(weights)
+
+            asset_distribution = self.asset_memory[-1] * weights
+            close_values = [1, self.data.close.values()]
+            target_holding = np.divide(asset_distribution, close_values)
+            trading = np.array(self.actions_memory[-1]) - target_holding
+            trading = trading[1:]
+            self.trades += len(trading[trading != 0]) 
+
+            argsort_actions = np.argsort(trading)
+
+            sell_index = argsort_actions[: np.where(trading < 0)[0].shape[0]]
+            buy_index = argsort_actions[::-1][: np.where(trading > 0)[0].shape[0]]
+
+            for index in sell_index:
+                target_holding[0] -= close_values[index + 1] * trading[index] * (1 - self.transaction_cost_pct)
+                self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct
+
+            for index in buy_index:
+                # print('take buy action: {}'.format(actions[index]))
+                target_holding[0] -= close_values[index + 1] * trading[index] * (1 + self.transaction_cost_pct)
+                self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct          
+
+            self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] 
+            self.asset_memory.append(np.sum(np.multiply(target_holding, close_values)))
+
+
+            self.actions_memory.append(target_holding)
             last_day_memory = self.data
 
             # load next state
@@ -174,20 +199,20 @@ class StockPortfolioEnv(gym.Env):
             # print(self.state)
             # calcualte portfolio return
             # individual stocks' return * weight
-            portfolio_return = sum(
-                ((self.data.close.values / last_day_memory.close.values) - 1) * weights
-            )
-            # update portfolio value
-            new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
-            self.portfolio_value = new_portfolio_value
+            # portfolio_return = sum(
+            #     ((self.data.close.values / last_day_memory.close.values) - 1) * weights
+            # )
+            # # update portfolio value
+            # new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
+            # self.portfolio_value = new_portfolio_value
 
             # save into memory
-            self.portfolio_return_memory.append(portfolio_return)
+            # self.portfolio_return_memory.append(portfolio_return)
             self.date_memory.append(self.data.date.unique()[0])
-            self.asset_memory.append(new_portfolio_value)
+            # self.asset_memory.append(new_portfolio_value)
 
             # the reward is the new portfolio value or end portfolo value
-            self.reward = new_portfolio_value
+            # self.reward = new_portfolio_value
             # print("Step reward: ", self.reward)
             # self.reward = self.reward*self.reward_scaling
 
@@ -205,11 +230,11 @@ class StockPortfolioEnv(gym.Env):
             axis=0,
         )
         self.portfolio_value = self.initial_amount
-        # self.cost = 0
-        # self.trades = 0
+        self.cost = 0
+        self.trades = 0
         self.terminal = False
         self.portfolio_return_memory = [0]
-        self.actions_memory = [[1 / self.stock_dim] * self.stock_dim]
+        self.actions_memory = [[self.initial_amount] + [0] * self.stock_dim]
         self.date_memory = [self.data.date.unique()[0]]
         return self.state
 
