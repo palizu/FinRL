@@ -160,7 +160,7 @@ class StockPortfolioEnv(gym.Env):
             weights = self.softmax_normalization(actions)
 
             asset_distribution = self.asset_memory[-1] * weights
-            close_values = [1] +  self.data.close.values()
+            close_values = np.append([1], self.data.close.values())
             target_holding = np.divide(asset_distribution, close_values)
             trading = np.array(self.actions_memory[-1]) - target_holding
             trading = trading[1:]
