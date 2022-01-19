@@ -180,9 +180,9 @@ class StockPortfolioEnv(gym.Env):
                 target_holding[0] -= close_values[index + 1] * trading[index] * (1 + self.transaction_cost_pct)
                 self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct   
 
-            if target_holding < 0:
-                penalty = target_holding
-                target_holding = 0       
+            if target_holding[0] < 0:
+                penalty = target_holding[0]
+                target_holding[0] = 0       
 
             self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] + penalty
             self.asset_memory.append(np.sum(np.multiply(target_holding, close_values), axis= 1))
