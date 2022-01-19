@@ -95,7 +95,7 @@ class StockPortfolioEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(self.state_space + len(self.tech_indicator_list), self.state_space),
+            shape=(self.stock_dim + len(self.tech_indicator_list), self.stock_dim),
         )
 
         # load data from a pandas dataframe
