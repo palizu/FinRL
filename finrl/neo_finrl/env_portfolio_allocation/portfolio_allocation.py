@@ -182,7 +182,9 @@ class StockPortfolioEnv(gym.Env):
 
             if target_holding[0] < 0:
                 penalty = target_holding[0]
-                target_holding[0] = 0       
+                target_holding[0] = 0   
+            else:
+                penalty = 0    
 
             self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] + penalty
             self.asset_memory.append(np.sum(np.multiply(target_holding, close_values), axis= 1))
