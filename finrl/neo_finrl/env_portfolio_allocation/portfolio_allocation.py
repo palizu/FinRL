@@ -181,7 +181,7 @@ class StockPortfolioEnv(gym.Env):
                 self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct          
 
             self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] 
-            self.asset_memory.append(np.sum(np.multiply(target_holding, close_values)))
+            self.asset_memory.append(np.sum(np.multiply(target_holding, close_values), axis= 1))
 
 
             self.actions_memory.append(target_holding)
