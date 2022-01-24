@@ -6,6 +6,7 @@ import pandas as pd
 from gym import spaces
 from gym.utils import seeding
 from stable_baselines3.common.vec_env import DummyVecEnv
+import decimal
 
 matplotlib.use("Agg")
 
@@ -112,10 +113,10 @@ class CryptoTradingEnv(gym.Env):
                     )
 
                     if self.min_buy_amount != []:
-                        if sell_num_shares < round(sell_num_shares, self.min_buy_amount[index]): 
-                            sell_num_shares = round(sell_num_shares, self.min_buy_amount[index]) - 10**(-self.min_buy_amount[index])
+                        if sell_num_shares < self.round_down(sell_num_shares, self.min_buy_amount[index]): 
+                            sell_num_shares = self.round_down(sell_num_shares, self.min_buy_amount[index]) - 10**(-self.min_buy_amount[index])
                         else:
-                            sell_num_shares = round(sell_num_shares, self.min_buy_amount[index])
+                            sell_num_shares = self.round_down(sell_num_shares, self.min_buy_amount[index])
 
                     sell_amount = (
                         self.state[index + 1]
@@ -128,7 +129,7 @@ class CryptoTradingEnv(gym.Env):
                     self.state[0] += sell_amount
 
                     self.state[index + self.stock_dim + 1] -= sell_num_shares
-                    self.state[index + self.stock_dim + 1] = round(self.state[index + self.stock_dim + 1], self.min_buy_amount[index])
+                    self.state[index + self.stock_dim + 1] = self.round_down(self.state[index + self.stock_dim + 1], self.min_buy_amount[index])
                     self.cost += (
                         self.state[index + 1] * sell_num_shares * self.sell_cost_pct
                     )
@@ -183,10 +184,10 @@ class CryptoTradingEnv(gym.Env):
                 # update balance
                 buy_num_shares = min(available_amount, action)
                 if self.min_buy_amount != []:
-                    if buy_num_shares < round(buy_num_shares, self.min_buy_amount[index]):
-                        buy_num_shares = round(buy_num_shares, self.min_buy_amount[index]) - 10**(-self.min_buy_amount[index])
+                    if buy_num_shares < self.round_down(buy_num_shares, self.min_buy_amount[index]):
+                        buy_num_shares = self.round_down(buy_num_shares, self.min_buy_amount[index]) - 10**(-self.min_buy_amount[index])
                     else:
-                        buy_num_shares = round(buy_num_shares, self.min_buy_amount[index])
+                        buy_num_shares = self.round_down(buy_num_shares, self.min_buy_amount[index])
                     
                 buy_amount = (
                     self.state[index + 1] * buy_num_shares * (1 + self.buy_cost_pct)
@@ -196,7 +197,7 @@ class CryptoTradingEnv(gym.Env):
                 self.state[0] -= buy_amount
 
                 self.state[index + self.stock_dim + 1] += buy_num_shares
-                self.state[index + self.stock_dim + 1] = round(self.state[index + self.stock_dim + 1], self.min_buy_amount[index])
+                self.state[index + self.stock_dim + 1] = self.round_down(self.state[index + self.stock_dim + 1], self.min_buy_amount[index])
 
                 self.cost += self.state[index + 1] * buy_num_shares * self.buy_cost_pct
                 self.trades += 1
@@ -618,3 +619,9 @@ class CryptoTradingEnv(gym.Env):
         e = DummyVecEnv([lambda: self])
         obs = e.reset()
         return e, obs
+
+    def round_down(self, value, decimals):
+        with decimal.localcontext() as ctx:
+            d = decimal.Decimal(value)
+            ctx.rounding = decimal.ROUND_DOWN
+            return round(d, decimals)

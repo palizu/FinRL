@@ -6,54 +6,13 @@ import pandas as pd
 from gym import spaces
 from gym.utils import seeding
 from stable_baselines3.common.vec_env import DummyVecEnv
+import decimal  
 
 matplotlib.use("Agg")
 
 
 class StockPortfolioEnv(gym.Env):
-    """A single stock trading environment for OpenAI gym
-    Attributes
-    ----------
-        df: DataFrame
-            input data
-        stock_dim : int
-            number of unique stocks
-        hmax : int
-            maximum number of shares to trade
-        initial_amount : int
-            start money
-        transaction_cost_pct: float
-            transaction cost percentage per trade
-        reward_scaling: float
-            scaling factor for reward, good for training
-        state_space: int
-            the dimension of input features
-        action_space: int
-            equals stock dimension
-        tech_indicator_list: list
-            a list of technical indicator names
-        turbulence_threshold: int
-            a threshold to control risk aversion
-        day: int
-            an increment number to control date
-    Methods
-    -------
-    _sell_stock()
-        perform sell action based on the sign of the action
-    _buy_stock()
-        perform buy action based on the sign of the action
-    step()
-        at each step the agent will return actions, then
-        we will calculate the reward, and return the next observation.
-    reset()
-        reset the environment
-    render()
-        use render to return other functions
-    save_asset_memory()
-        return account value at each time step
-    save_action_memory()
-        return actions/positions at each time step
-    """
+
 
     metadata = {"render.modes": ["human"]}
 
@@ -61,7 +20,6 @@ class StockPortfolioEnv(gym.Env):
         self,
         df,
         stock_dim,
-        hmax,
         initial_amount,
         transaction_cost_pct,
         reward_scaling,
@@ -69,16 +27,12 @@ class StockPortfolioEnv(gym.Env):
         action_space,
         tech_indicator_list,
         turbulence_threshold=None,
-        lookback=252,
-        day=0,
+        min_trans_amount=[],
+        day=0
     ):
-        # super(StockEnv, self).__init__()
-        # money = 10 , scope = 1
         self.day = day
-        self.lookback = lookback
         self.df = df
         self.stock_dim = stock_dim
-        self.hmax = hmax
         self.initial_amount = initial_amount
         self.transaction_cost_pct = transaction_cost_pct
         self.reward_scaling = reward_scaling
@@ -87,6 +41,8 @@ class StockPortfolioEnv(gym.Env):
         self.tech_indicator_list = tech_indicator_list
         self.cost = 0
         self.trades = 0
+        self.weights = [[1] + [0] * self.stock_dim]
+        self.min_trans_amount = min_trans_amount
 
         # action_space normalization and shape is self.stock_dim
         self.action_space = spaces.Box(low=0, high=1, shape=(self.action_space,))
@@ -161,7 +117,9 @@ class StockPortfolioEnv(gym.Env):
 
             asset_distribution = self.asset_memory[-1] * weights
             close_values = np.append([1], self.data.close.values.tolist())
-            target_holding = np.floor(np.divide(asset_distribution, close_values))
+            target_holding = np.divide(asset_distribution, close_values)
+            for i in range(self.stock_dim):
+                target_holding[i + 1] = self.round_down(target_holding[i + 1], self.min_trans_amount[i])
             trading = np.array(self.actions_memory[-1]) - target_holding
             trading = trading[1:]
             self.trades += len(trading[trading != 0]) 
@@ -171,14 +129,17 @@ class StockPortfolioEnv(gym.Env):
             sell_index = argsort_actions[: np.where(trading < 0)[0].shape[0]]
             buy_index = argsort_actions[::-1][: np.where(trading > 0)[0].shape[0]]
 
+            trans_cost = 0
+
             for index in sell_index:
-                target_holding[0] -= close_values[index + 1] * trading[index] * (1 - self.transaction_cost_pct)
-                self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct
+                trans_cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct * -1
 
             for index in buy_index:
                 # print('take buy action: {}'.format(actions[index]))
-                target_holding[0] -= close_values[index + 1] * trading[index] * (1 + self.transaction_cost_pct)
-                self.cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct   
+                trans_cost += close_values[index + 1] * trading[index] * self.transaction_cost_pct   
+            
+            target_holding[0] -= trans_cost
+            self.cost += trans_cost
 
             if target_holding[0] < 0:
                 penalty = target_holding[0]
@@ -186,14 +147,7 @@ class StockPortfolioEnv(gym.Env):
             else:
                 penalty = 0    
 
-            self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] + penalty
-            self.asset_memory.append(np.sum(np.multiply(target_holding, close_values)))
-
-
-            self.actions_memory.append(target_holding)
-            last_day_memory = self.data
-
-            # load next state
+             # load next state
             self.day += 1
             self.data = self.df.loc[self.day, :]
             self.covs = self.data["cov_list"].values[0]
@@ -202,18 +156,14 @@ class StockPortfolioEnv(gym.Env):
                 [self.data[tech].values.tolist() for tech in self.tech_indicator_list],
                 axis=0,
             )
-            # print(self.state)
-            # calcualte portfolio return
-            # individual stocks' return * weight
-            # portfolio_return = sum(
-            #     ((self.data.close.values / last_day_memory.close.values) - 1) * weights
-            # )
-            # # update portfolio value
-            # new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
-            # self.portfolio_value = new_portfolio_value
 
-            # save into memory
-            # self.portfolio_return_memory.append(portfolio_return)
+            close_values = np.append([1], self.data.close.values.tolist())
+            self.reward = np.sum(np.multiply(target_holding, close_values)) - self.asset_memory[-1] + penalty
+            self.asset_memory.append(np.sum(np.multiply(target_holding, close_values)))
+
+            self.actions_memory.append(target_holding)
+            self.weights.append(weights)
+           
             self.date_memory.append(self.data.date.unique()[0])
             # self.asset_memory.append(new_portfolio_value)
 
@@ -227,6 +177,7 @@ class StockPortfolioEnv(gym.Env):
     def reset(self):
         self.asset_memory = [self.initial_amount]
         self.day = 0
+        self.weights = [[1] + [0] * self.stock_dim]
         self.data = self.df.loc[self.day, :]
         # load states
         self.covs = self.data["cov_list"].values[0]
@@ -253,16 +204,6 @@ class StockPortfolioEnv(gym.Env):
         softmax_output = numerator / denominator
         return softmax_output
 
-    # def save_asset_memory(self):
-    #     date_list = self.date_memory
-    #     portfolio_return = self.portfolio_return_memory
-    #     # print(len(date_list))
-    #     # print(len(asset_list))
-    #     df_account_value = pd.DataFrame(
-    #         {"date": date_list, "daily_return": portfolio_return}
-    #     )
-    #     return df_account_value
-
     def save_asset_memory(self):
         date_list = self.date_memory
         asset_list = self.asset_memory
@@ -280,8 +221,10 @@ class StockPortfolioEnv(gym.Env):
         df_date.columns = ["date"]
 
         action_list = self.actions_memory
-        df_actions = pd.DataFrame(action_list)
-        df_actions.columns = ['cash'] + self.data.tic.values.tolist()
+        weights_list = self.weights
+        # action_list = self.weights
+        df_actions = pd.DataFrame(np.append(action_list, weights_list, axis=1))
+        df_actions.columns = ['cash'] + self.data.tic.values.tolist() + ['cashh', 'ada', 'algo', 'btc', 'eth']
         df_actions.index = df_date.date
         # df_actions = pd.DataFrame({'date':date_list,'actions':action_list})
         return df_actions
@@ -294,3 +237,9 @@ class StockPortfolioEnv(gym.Env):
         e = DummyVecEnv([lambda: self])
         obs = e.reset()
         return e, obs
+
+    def round_down(self, value, decimals):
+        with decimal.localcontext() as ctx:
+            d = decimal.Decimal(value)
+            ctx.rounding = decimal.ROUND_DOWN
+            return round(d, decimals)
