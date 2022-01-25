@@ -80,25 +80,25 @@ class StockPortfolioEnv(gym.Env):
         # print(actions)
 
         if self.terminal:
-            df = pd.DataFrame(self.portfolio_return_memory)
-            df.columns = ["daily_return"]
+            df = pd.DataFrame(self.asset_memory)
+            df.columns = ["account_value"]
             plt.plot(df.daily_return.cumsum(), "r")
             plt.close()
 
-            plt.plot(self.portfolio_return_memory, "r")
+            plt.plot(self.asset_memory, "r")
             plt.close()
 
             print("=================================")
             print("begin_total_asset:{}".format(self.asset_memory[0]))
-            print("end_total_asset:{}".format(self.portfolio_value))
+            print("end_total_asset:{}".format(self.asset_memory[-1]))
 
-            df_daily_return = pd.DataFrame(self.portfolio_return_memory)
-            df_daily_return.columns = ["daily_return"]
-            if df_daily_return["daily_return"].std() != 0:
+            df_account_value = pd.DataFrame(self.asset_memory)
+            df_account_value.columns = ["account_value"]
+            if df_account_value["account_value"].std() != 0:
                 sharpe = (
                     (252 ** 0.5)
-                    * df_daily_return["daily_return"].mean()
-                    / df_daily_return["daily_return"].std()
+                    * df_account_value["account_value"].mean()
+                    / df_account_value["account_value"].std()
                 )
                 print("Sharpe: ", sharpe)
             print("=================================")
