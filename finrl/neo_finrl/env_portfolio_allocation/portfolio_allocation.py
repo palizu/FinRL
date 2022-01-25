@@ -82,7 +82,6 @@ class StockPortfolioEnv(gym.Env):
         if self.terminal:
             df = pd.DataFrame(self.asset_memory)
             df.columns = ["account_value"]
-            plt.plot(df.daily_return.cumsum(), "r")
             plt.close()
 
             plt.plot(self.asset_memory, "r")
